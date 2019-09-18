@@ -8,23 +8,6 @@ impurity.gini <- function(values) {
   imp = pos*neg
 }
 
-# Get the x-row index for a certain split points
-get_x_index <- function(x, split_point){ 
-  best_small_split = c()
-  best_big_split = c()
-  cs= 1 
-  cb= 1
-  for (i in 1:length(x)){
-    if (x[i] < split_point) {
-      best_small_split[cs] = i
-      cs = cs+1
-    } else {
-      best_big_split[cb] = i
-      cb = cb+1
-    }
-  }
-  return(list(best_big_split, best_small_split))
-}
 
 # Returns the best split for an attribute of the dataset
 best_split <- function(x, x_row, y, minleaf) {
