@@ -55,7 +55,8 @@ best_split <- function(x, y, minleaf) {
 }
 
 # Determine the best split over all of the attributes at a certain node
-get_split <- function(x, y, nfeat, minleaf) {
+get_split <- function(x_row, y, nfeat, minleaf) {
+  x <- credit[x_row, ]
   b_gini <- 0
   for (i in 1:nfeat){
     split <- best_split(x[,i], y, minleaf)
@@ -70,7 +71,7 @@ get_split <- function(x, y, nfeat, minleaf) {
 }
 
 tree.grow <- function(x, y, nmin, minleaf, nfeat){
-  root <- Node$new('start', data_x = x, data_y = y)
+  root <- Node$new('start', data_x = c(1:length(x[,1])), data_y = y)
   nodelist <- list(root)
   while(length(nodelist) > 0) {
     node <- nodelist[[1]]
@@ -78,10 +79,20 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
     
     if (impurity.gini(node$data_y) > 0 && length(node$data_y) >= nmin) {
       split <- get_split(node$data_x, node$data_y, nfeat, minleaf)
-      split_attribute <- split[1]
-      split_value <- split[2]
-      print(split_attribute)
-      print(split_value)
+      
+      split_attribute <- split[[1]]
+      split_value <- split[[2]]
+      
+      left_data <- split[[3]]
+      right_data <- split[[4]]
+      
+      left_y <- y[left_data]
+      right_y <- y[right_data]
+
+      leftchild <- node$AddChild('left', data_x = left_data, data_y = left_y, split_attribute = split_attribute, split_value = split_value)
+      rightchild <- node$AddChild('right', data_x = right_data, data_y = right_y, split_attribute = split_attribute, split_value = split_value)
+    
+      nodelist <- c(nodelist, list(leftchild, rightchild))
     }
   }
   
