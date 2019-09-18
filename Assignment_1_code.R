@@ -55,7 +55,7 @@ best_split <- function(x, y, minleaf) {
 }
 
 # Determine the best split over all of the attributes at a certain node
-get_split <- function(x, y, nmin, minleaf, nfeat) {
+get_split <- function(x, y, nfeat, minleaf) {
   b_gini <- 0
   for (i in 1:nfeat){
     split <- best_split(x[,i], y, minleaf)
@@ -77,7 +77,7 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
     nodelist[[1]] <- NULL
     
     if (impurity.gini(node$data_y) > 0 && length(node$data_y) >= nmin) {
-      split <- get_split(node$data_x, node$data_y, minleaf)
+      split <- get_split(node$data_x, node$data_y, nfeat, minleaf)
       split_attribute <- split[1]
       split_value <- split[2]
       print(split_attribute)
