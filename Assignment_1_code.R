@@ -28,6 +28,7 @@ get_x_index <- function(x, split_point){
 
 # Returns the best split for an attribute of the dataset
 best_split <- function(x, y, minleaf) {
+  
   parent_i <- impurity.gini(y)
   x.sorted <- sort(unique(x))
   x.length <- length(x.sorted)
@@ -54,7 +55,7 @@ best_split <- function(x, y, minleaf) {
 }
 
 # Determine the best split over all of the attributes at a certain node
-get_split <- function(x, y, nfeat, minleaf) {
+get_split <- function(x, y, nmin, minleaf, nfeat) {
   b_gini <- 0
   for (i in 1:nfeat){
     split <- best_split(x[,i], y, minleaf)
@@ -87,9 +88,9 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
 }
 
 credit <- read.csv('C:/Users/Lisa/Desktop/UU/Data_Mining_2019/credit.txt', header = TRUE)
-# print(credit)
-# b_split <- best_split(credit[,4],credit[,6])
-cx <- credit[,4]
+# # print(credit)
+# # b_split <- best_split(credit[,4],credit[,6])
+# cx <- credit[,4]
 
 credit.y <- credit[,6]
 credit.x <- credit[1:5]
