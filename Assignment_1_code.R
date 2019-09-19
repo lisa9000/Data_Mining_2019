@@ -58,6 +58,11 @@ get_split <- function(x_row, y, nfeat, minleaf) {
   return(b_split)
 }
 
+toLeafNode <- function(node) {
+  max_index <- which.max(node$data_y)
+  node$Set(label = node$data_y[max_index])
+}
+
 tree.grow <- function(x, y, nmin, minleaf, nfeat){
   attribute_names = colnames(x)
   root <- Node$new('start', data_x = c(1:length(x[,1])), data_y = y)
@@ -82,9 +87,12 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
       rightchild <- node$AddChild('Smaller', data_x = right_data, data_y = right_y, split_attribute = attribute_names[split_attribute], split_value = split_value)
     
       nodelist <- c(nodelist, list(leftchild, rightchild))
+    } else {
+      toLeafNode(node)
     }
   }
-  print(root, 'split_attribute', "split_value", "data_y")
+  print(root, 'split_attribute', "split_value", "data_y", "label")
+  # return(root)
 }
 
 credit <- read.csv('C:/Users/Lisa/Desktop/UU/Data_Mining_2019/credit.txt', header = TRUE)
