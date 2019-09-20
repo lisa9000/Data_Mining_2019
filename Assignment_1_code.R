@@ -14,7 +14,6 @@ best_split <- function(x, x_row, y, minleaf) {
   parent_i <- impurity.gini(y)
   x.sorted <- sort(unique(x))
   x.length <- length(x.sorted)
-  x.splitpoints <- x.sorted[2]
   x.splitpoints <- (x.sorted[1:x.length-1]+x.sorted[2:x.length])/2
   best_split_point <- -999
   best_reduction <- -999
@@ -82,9 +81,10 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
       
       left_y <- y[left_data]
       right_y <- y[right_data]
-
-      leftchild <- node$AddChild('Bigger', data_x = left_data, data_y = left_y, split_attribute = attribute_names[split_attribute], split_value = split_value)
-      rightchild <- node$AddChild('Smaller', data_x = right_data, data_y = right_y, split_attribute = attribute_names[split_attribute], split_value = split_value)
+      
+      node$Set(split_attribute = attribute_names[split_attribute], split_value = split_value)
+      leftchild <- node$AddChild('Bigger', data_x = left_data, data_y = left_y)
+      rightchild <- node$AddChild('Smaller', data_x = right_data, data_y = right_y)
     
       nodelist <- c(nodelist, list(leftchild, rightchild))
     } else {
@@ -92,18 +92,35 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
     }
   }
   print(root, 'split_attribute', "split_value", "data_y", "label")
-  # return(root)
+  return(root)
 }
 
+tree.classify <- function(x, tr) {
+  y <- NULL
+  for (row in 1:nrow(x)) {
+    node <- tr
+    
+    while(!isLeaf(node)) {
+      if (x[row, node$split_attribute] > node$split_value) {
+        node <- node$Bigger
+      } else {
+        node <- node$Smaller
+      }
+    }
+    y[row] <- node$label
+  }
+  return(y)
+}
 credit <- read.csv('C:/Users/Lisa/Desktop/UU/Data_Mining_2019/credit.txt', header = TRUE)
 # # print(credit)
 # # b_split <- best_split(credit[,4],credit[,6])
 # cx <- credit[,4]
 
 credit.y <- credit[,6]
-credit.x <- credit[1:5]
-credit.nfeat <- length(credit.x[1,])
+credit.x_1 <- credit[1:8,1:5]
+credit.x_2 <- credit[9:10, 1:5]
+credit.nfeat <- length(credit.x_1[1,])
 
-
-tree.grow(credit.x, credit.y, 2, 1, credit.nfeat)
+tree <- tree.grow(credit.x_1, credit.y, 2, 1, credit.nfeat)
+tree.classify(credit.x_2, tree)
 
