@@ -15,19 +15,26 @@ mode <- function(x) {
 # Returns the best split for an attribute of the dataset
 best.split <- function(x, x_row, y, minleaf) {
   parent_i <- impurity.gini(y)
-  x_sorted <- sort(unique(x))
+  x <- as.numeric(x)
+  x_unique <- unique(x)
+  x_sorted <- sort(x_unique)
   x_length <- length(x_sorted)
-  x_splitpoints <- (x_sorted[1:x_length-1]+x_sorted[2:x_length])/2
+  if (length(x_sorted) < 2) {
+    return(NULL)
+  }
+  x_splitpoints <- (x_sorted[1:(x_length-1)] + x_sorted[2:x_length])/2
+  # print(x_splitpoints)
   best_splitpoint <- -999
   best_reduction <- -999
   # Loop over the data to determine the best split point based on impurity reduction
   for (val in x_splitpoints) {
+    # print(y[x>val])
     left_split <- y[x > val]
     right_split <- y[x <= val]
     left_imp <- impurity.gini(left_split)
     right_imp <- impurity.gini(right_split)
     reduction_imp = parent_i -(right_imp * (length(right_split)/length(x))+left_imp*(length(left_split)/length(x)))
-    
+    # print(reduction_imp)
     if (length(right_split) >= minleaf && length(left_split) >= minleaf) {
       if (reduction_imp > best_reduction) {
         best_splitpoint <- val
@@ -44,9 +51,9 @@ best.split <- function(x, x_row, y, minleaf) {
 
 # Determine the best split over all of the attributes at a certain node
 get.split <- function(x_row, y, nfeat, minleaf) {
-  x <- credit[x_row, ]
+  x <- data_eclipse_2.0[x_row, ]
   b_gini <- 0
-  predictors <- sample(ncol(x)-1, nfeat)
+  predictors <- sample(ncol(x), nfeat)
   for (i in predictors){
     split <- best.split(x[,i], x_row, y, minleaf)
     
@@ -154,4 +161,8 @@ tree.classify.bag <- function(x, tr) {
 # trees <- tree.grow.bag(credit.x_1, credit.y, 2, 1, credit.nfeat, 5)
 # tree.classify.bag(credit.x_2, trees)
 
-data_eclipse_2.0 <- read.csv2('C:/Users/Lisa/Desktop/UU/Data_Mining_2019/eclipse-metrics-packages-2.0')
+eclipse_2.0 <- read.csv2('C:/Users/Lisa/Desktop/UU/Data_Mining_2019/eclipse-metrics-packages-2.0.csv', header = TRUE)
+data_eclipse_2.0 <- eclipse_2.0[,c(3, 5:44)]
+eclipse_2.0_labels <- as.numeric(eclipse_2.0[,4] > 0)
+
+tree.grow(data_eclipse_2.0, eclipse_2.0_labels, 15, 5, 41)
