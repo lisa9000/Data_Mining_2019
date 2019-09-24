@@ -46,7 +46,8 @@ best.split <- function(x, x_row, y, minleaf) {
 get.split <- function(x_row, y, nfeat, minleaf) {
   x <- credit[x_row, ]
   b_gini <- 0
-  for (i in 1:nfeat){
+  predictors <- sample(ncol(x)-1, nfeat)
+  for (i in predictors){
     split <- best.split(x[,i], x_row, y, minleaf)
     
     if (is.null(split)) next
@@ -68,6 +69,7 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
   attribute_names = colnames(x)
   root <- Node$new('start', dataX = c(1:length(x[,1])), dataY = y)
   nodelist <- list(root)
+  
   while(length(nodelist) > 0) {
     node <- nodelist[[1]]
     nodelist[[1]] <- NULL
@@ -83,7 +85,7 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
       
       left_y <- y[left_data]
       right_y <- y[right_data]
-      
+      # print(print(attribute_names))
       node$Set(splitAttribute = attribute_names[split_attribute], splitValue = split_value)
       leftchild <- node$AddChild('leftChild', dataX = left_data, dataY = left_y)
       rightchild <- node$AddChild('rightChild', dataX = right_data, dataY = right_y)
@@ -137,17 +139,19 @@ tree.classify.bag <- function(x, tr) {
 }
 
 
-credit <- read.csv('C:/Users/Lisa/Desktop/UU/Data_Mining_2019/credit.txt', header = TRUE)
-# # print(credit)
-# # b_split <- best.split(credit[,4],credit[,6])
+# credit <- read.csv('C:/Users/Lisa/Desktop/UU/Data_Mining_2019/credit.txt', header = TRUE)
+# print(credit)
+# b_split <- best.split(credit[,4],credit[,6])
 # cx <- credit[,4]
+# 
+# credit.y <- credit[1:10,6]
+# credit.x_1 <- credit[1:10,1:5]
+# credit.x_2 <- credit[11:12, 1:5]
+# credit.nfeat <- length(credit.x_1[1,])
+# 
+# tree <- tree.grow(credit.x_1, credit.y, 2, 1, credit.nfeat)
+# tree.classify(credit.x_2, tree)
+# trees <- tree.grow.bag(credit.x_1, credit.y, 2, 1, credit.nfeat, 5)
+# tree.classify.bag(credit.x_2, trees)
 
-credit.y <- credit[1:10,6]
-credit.x_1 <- credit[1:10,1:5]
-credit.x_2 <- credit[11:12, 1:5]
-credit.nfeat <- length(credit.x_1[1,])
-
-tree <- tree.grow(credit.x_1, credit.y, 2, 1, credit.nfeat)
-tree.classify(credit.x_2, tree)
-trees <- tree.grow.bag(credit.x_1, credit.y, 2, 1, credit.nfeat, 5)
-tree.classify.bag(credit.x_2, trees)
+data_eclipse_2.0 <- read.csv2('C:/Users/Lisa/Desktop/UU/Data_Mining_2019/eclipse-metrics-packages-2.0')
