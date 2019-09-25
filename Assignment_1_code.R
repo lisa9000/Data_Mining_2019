@@ -23,18 +23,15 @@ best.split <- function(x, x_row, y, minleaf) {
     return(NULL)
   }
   x_splitpoints <- (x_sorted[1:(x_length-1)] + x_sorted[2:x_length])/2
-  # print(x_splitpoints)
   best_splitpoint <- -999
   best_reduction <- -999
   # Loop over the data to determine the best split point based on impurity reduction
   for (val in x_splitpoints) {
-    # print(y[x>val])
     left_split <- y[x > val]
     right_split <- y[x <= val]
     left_imp <- impurity.gini(left_split)
     right_imp <- impurity.gini(right_split)
     reduction_imp = parent_i -(right_imp * (length(right_split)/length(x))+left_imp*(length(left_split)/length(x)))
-    # print(reduction_imp)
     if (length(right_split) >= minleaf && length(left_split) >= minleaf) {
       if (reduction_imp > best_reduction) {
         best_splitpoint <- val
@@ -92,7 +89,6 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
       
       left_y <- y[left_data]
       right_y <- y[right_data]
-      # print(print(attribute_names))
       node$Set(splitAttribute = attribute_names[split_attribute], splitValue = split_value)
       leftchild <- node$AddChild('leftChild', dataX = left_data, dataY = left_y)
       rightchild <- node$AddChild('rightChild', dataX = right_data, dataY = right_y)
@@ -102,7 +98,6 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
       to.leaf(node)
     }
   }
-  # print(root, 'splitAttribute', "splitValue", "dataY", "label")
   return(root)
 }
 
@@ -112,7 +107,7 @@ tree.classify <- function(x, tr) {
     node <- tr
     
     while(!isLeaf(node)) {
-      if (x[row, node$splitAttribute] > node$splitValue) {
+      if (as.numeric(x[row, node$splitAttribute]) > node$splitValue) {
         node <- node$leftChild
       } else {
         node <- node$rightChild
@@ -127,7 +122,6 @@ tree.grow.bag <- function(x, y, nmin, minleaf, nfeat, m) {
   trees <- c()
   for (i in 1:m) {
     samples <- sample(nrow(x), nrow(x), TRUE)
-    
     trees <- append(trees, tree.grow(x[samples, ], y[samples], nmin, minleaf, nfeat))
   }
   return(trees)
@@ -145,24 +139,25 @@ tree.classify.bag <- function(x, tr) {
   return(predictions)
 }
 
-
-# credit <- read.csv('C:/Users/Lisa/Desktop/UU/Data_Mining_2019/credit.txt', header = TRUE)
-# print(credit)
-# b_split <- best.split(credit[,4],credit[,6])
-# cx <- credit[,4]
-# 
-# credit.y <- credit[1:10,6]
-# credit.x_1 <- credit[1:10,1:5]
-# credit.x_2 <- credit[11:12, 1:5]
-# credit.nfeat <- length(credit.x_1[1,])
-# 
-# tree <- tree.grow(credit.x_1, credit.y, 2, 1, credit.nfeat)
-# tree.classify(credit.x_2, tree)
-# trees <- tree.grow.bag(credit.x_1, credit.y, 2, 1, credit.nfeat, 5)
-# tree.classify.bag(credit.x_2, trees)
-
-eclipse_2.0 <- read.csv2('C:/Users/Lisa/Desktop/UU/Data_Mining_2019/eclipse-metrics-packages-2.0.csv', header = TRUE)
+# training data
+eclipse_2.0 <- read.csv2('C:/Users/Lisa/Desktop/UU/Data_Mining_2019/eclipse-metrics-packages-2.0.csv')
 data_eclipse_2.0 <- eclipse_2.0[,c(3, 5:44)]
 eclipse_2.0_labels <- as.numeric(eclipse_2.0[,4] > 0)
 
-tree.grow(data_eclipse_2.0, eclipse_2.0_labels, 15, 5, 41)
+# test data
+eclipse_3.0 <- read.csv2('C:/Users/Lisa/Desktop/UU/Data_Mining_2019/eclipse-metrics-packages-3.0.csv')
+data_eclipse_3.0 <- eclipse_3.0[,c(3, 5:44)]
+eclipse_3.0_labels <- as.numeric(eclipse_3.0[,4] > 0)
+main <- function() {
+  tree_1 <- tree.grow(data_eclipse_2.0, eclipse_2.0_labels, 15, 5, 41)
+  predictions_1 <- tree.classify(data_eclipse_3.0, tree_1)
+  
+  trees_1 <- tree.grow.bag(data_eclipse_2.0, eclipse_2.0_labels, 15, 5, 41, 100)
+  predictions_2 <- tree.classify.bag(data_eclipse_3.0, trees_1)
+  print(predictions_2)
+  
+  trees_2 <- tree.grow.bag(data_eclipse_2.0, eclipse_2.0_labels, 15, 5, 6, 100)
+  predictions_3 <- tree.classify.bag(data_eclipse_3.0, trees_2)
+}
+main()
+
