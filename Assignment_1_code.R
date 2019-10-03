@@ -1,100 +1,152 @@
 library(data.tree)
 
 # Calculate the impurity of a node using the Gini index
+#   values: A binary vector
 impurity.gini <- function(values) {
-  pos = sum(values == 1)/length(values)
-  neg = 1 - pos
-  imp = pos*neg
+  len <- length(values)
+  pos <- sum(values == 1)/len
+  neg <- 1-pos
+  return(neg*pos)
 }
 
-mode <- function(x) {
-  x_unique <- unique(x)
-  return(x_unique[which.max(tabulate(match(x, x_unique)))])
-}
+# Calculate the class label
+#   values: a vector of binary class values
+mode <- function(values) return(sum(values)>(0.5*length(values)))
 
 # Returns the best split for an attribute of the dataset
+#   x: The rows of the dataset corresponding to x_row
+#   x_row: The row numbers of the dataset in the current node that can be used for splitting
+#   y: The class labels of the corresponding part of the dataset of x_row
+#   minleaf: The minimum number of datapoints that needs to be in a node to not be a leafnode
 best.split <- function(x, x_row, y, minleaf) {
-  parent_i <- impurity.gini(y)
-  x <- as.numeric(as.character(x))
+  
+  # Find the possible split points for the data
   x_unique <- unique(x)
   x_sorted <- sort(x_unique)
   x_length <- length(x_sorted)
+  # If there is only one split point a split is not possible, since the length of the data is too small
   if (length(x_sorted) < 2) {
     return(NULL)
   }
   x_splitpoints <- (x_sorted[1:(x_length-1)] + x_sorted[2:x_length])/2
+  
+  # Calculate impurity of the parent node
+  parent_i <- impurity.gini(y)
   best_splitpoint <- -999
   best_reduction <- -999
-  # Loop over the data to determine the best split point based on impurity reduction
+  
+  # Loop over the data to determine the best split point based on the highest impurity reduction
   for (val in x_splitpoints) {
     left_split <- y[x > val]
     right_split <- y[x <= val]
-    left_imp <- impurity.gini(left_split)
-    right_imp <- impurity.gini(right_split)
-    reduction_imp = parent_i -(right_imp * (length(right_split)/length(x))+left_imp*(length(left_split)/length(x)))
+    
+    # Only consider splits with that meet the minleaf constraint, others are not allowed
     if (length(right_split) >= minleaf && length(left_split) >= minleaf) {
+      left_imp <- impurity.gini(left_split)
+      right_imp <- impurity.gini(right_split)
+      reduction_imp <- parent_i - ((right_imp * (length(right_split)/length(x)))+(left_imp*(length(left_split)/length(x))))
       if (reduction_imp > best_reduction) {
         best_splitpoint <- val
         best_reduction <- reduction_imp
-        best_splitrows <- list(x_row[x > val], x_row[x <= val])
+        best_splitrows <- list('left_split'= x_row[x > val], 'right_split'= x_row[x <= val])
       }
     }
   }
+  # If there was no split found
   if (best_splitpoint == -999) {
     return(NULL)
   }
-  return(append(c(best_reduction, best_splitpoint),best_splitrows))
+  return(append(list('best_reduction' = best_reduction, 'best_splitpoint'= best_splitpoint), best_splitrows))
 }
 
 # Determine the best split over all of the attributes at a certain node
+#   x_row: a vector with the row numbers of the dataset for a given node
+#   y: a binary vector with the class labels corresponding to x_row in the dataset
+#   nfeat: The number of features that need to be considerd by the sampeling for predictors
+#   minleaf: The minimum number of datapoints that needs to be in a node to not be a leaf node
 get.split <- function(x_row, y, nfeat, minleaf) {
-  # x <- pima_data[x_row, ]
-  x <- data_eclipse_2.0[x_row, ]
-  b_gini <- 0
+  
+  # Extract the relevant rows of the data using x_row
+  x <- train_data[x_row, ]
+  b_gini <- -999
+  b_split <- NULL
   predictors <- sample(ncol(x), nfeat)
+  
+  # Loop over the sampled predictors until the best split is found
   for (i in predictors){
     split <- best.split(x[,i], x_row, y, minleaf)
     
+    # If there was no split found go to next predictor
     if (is.null(split)) next
-    gini <- unlist(split[1])
-    # The best split is the split with best reduction
+    
+    # Unlist the impurity value since we don't need it further in the program
+    gini <- unlist(split$best_reduction)
+   
+     # The best split is the split with best reduction
     if (gini > b_gini){
       b_gini <- gini
-      b_split <- append(i,split[2:4])
+      b_split <- append(list('attribute'= i), split[2:4])
     }
   }
   return(b_split)
+  
 }
 
+# Sets a class labels for a node if it becomes a leaf node
+#   node: the node that needs to have it's class label set
 to.leaf <- function(node) {
+  
+  # Uses the classlabels that are stored in the node
   node$Set(label = mode(node$dataY))
 }
 
-tree.grow <- function(x, y, nmin, minleaf, nfeat){
-  attribute_names = colnames(x)
-  root <- Node$new('start', dataX = c(1:length(x[,1])), dataY = y)
+# Grows a tree datastructure
+#   x_row: The row numbers of the dataset
+#   y: The class labels of the dataset
+#   nmin: The minimm length of the data in a node to not be a leaf node. 
+#   minleaf: minleaf: The minimum number of datapoints that needs to be in a node to not be a leafnode
+#   nfeat: The number of features that need to be sampled from the dataset
+tree.grow <- function(x_row, y, nmin, minleaf, nfeat){
+  # Collect the columnames from the dataset
+  attribute_names = colnames(train_data)
+  
+  # Set the rootnode with the full dataset row numbers and the all it's class labels
+  root <- Node$new('start', dataX = x_row, dataY = y)
+  
+  # Convert the root into a list
   nodelist <- list(root)
   
+  # While there are nodes in the nodes list expand the tree
   while(length(nodelist) > 0) {
+    
+    # Select the first node
     node <- nodelist[[1]]
     nodelist[[1]] <- NULL
     
-    if (impurity.gini(node$dataY) > 0 && length(node$dataY) >= nmin) {
+    # Only consider a split if the node is not already pure of it the lenght of the dataset is shorter than nmin
+    # Else the node is a leaf node
+    if (impurity.gini(node$dataY) > 0 && length(node$dataX) > nmin) {
+      
+      # The best split point as given by best split
       split <- get.split(node$dataX, node$dataY, nfeat, minleaf)
       
-      split_attribute <- split[[1]]
-      split_value <- split[[2]]
-      
-      left_data <- split[[3]]
-      right_data <- split[[4]]
-      
-      left_y <- y[left_data]
-      right_y <- y[right_data]
-      node$Set(splitAttribute = attribute_names[split_attribute], splitValue = split_value)
-      leftchild <- node$AddChild('leftChild', dataX = left_data, dataY = left_y)
-      rightchild <- node$AddChild('rightChild', dataX = right_data, dataY = right_y)
-    
-      nodelist <- c(nodelist, list(leftchild, rightchild))
+      # # If there was no split found make the node a leaf node else create childeren based on the split
+      if(is.null(split)) {
+        isLeaf(node)
+      } else {
+        
+        # Split the class labels into corresponding to the left and right data
+        left_y <- y[split$left_split]
+        right_y <- y[split$right_split]
+        
+        # Set the split attribute and value for the current node and create the childeren
+        node$Set(splitAttribute = attribute_names[split$attribute], splitValue = split$best_splitpoint)
+        leftchild <- node$AddChild('leftChild', dataX = split$left_split, dataY = left_y)
+        rightchild <- node$AddChild('rightChild', dataX = split$right_split, dataY = right_y)
+        
+        # Add the childeren to the leaf node
+        nodelist <- append(nodelist, list(leftchild, rightchild))
+      }
     } else {
       to.leaf(node)
     }
@@ -102,44 +154,73 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
   return(root)
 }
 
-tree.classify <- function(x, tr) {
-  y <- NULL
-  for (row in 1:nrow(x)) {
+
+# Predicts the class labels for a given dataset and a tree structure
+#   data: The dataset that needs to have it's class labels predicted
+#   tr: The data.tree structure build by tree.grow
+tree.classify <- function(data, tr) {
+  y <- c(1:100)
+  for (i in 1:nrow(data)) {
     node <- tr
-    
+    # While the node is not a leaf node, (isLeaf() is a function of data.tree package)
     while(!isLeaf(node)) {
-      if (as.numeric(as.character(x[row, node$splitAttribute])) > node$splitValue) {
+      
+      # If the value of the data is larger then the split value go to left child if smaller go to right child
+      if (data[i, node$splitAttribute] > node$splitValue) {
         node <- node$leftChild
       } else {
         node <- node$rightChild
       }
     }
-    y[row] <- node$label
+    
+    # Retrieve the class label and store at the corresponding spot in the y vector
+    y[i] <- node$label
   }
   return(y)
 }
 
-tree.grow.bag <- function(x, y, nmin, minleaf, nfeat, m) {
+# Multiple times grows a tree using tree.grow and stores them in a list
+#   x_row: The row numbers of the dataset
+#   y: The class labels of the dataset
+#   nmin: The minimm length of the data in a node to not be a leaf node. 
+#   minleaf: The minimum number of datapoints that needs to be in a node to not be a leafnode
+#   nfeat: The number of features that need to be sampled from the dataset
+#   m: The number of trees that need to be grown
+tree.grow.bag <- function(x_row, y, nmin, minleaf, nfeat, m) {
   trees <- c()
   for (i in 1:m) {
-    samples <- sample(nrow(x), nrow(x), TRUE)
-    trees <- append(trees, tree.grow(x[samples, ], y[samples], nmin, minleaf, nfeat))
+    
+    # Sample  from the rows of x to create a distinct datasets
+    samples <- sample(length(x_row), length(x_row), TRUE)
+    
+    # Give the samples to tree.grow as the row numbers of the dataset
+    trees <- append(trees, tree.grow(samples, y[samples], nmin, minleaf, nfeat))
   }
   return(trees)
 }
 
-tree.classify.bag <- function(x, tr) {
+# Classifies the data using a list of trees generated by tree.grow.bag
+#   data: The dataset that needs to have it's class labels predicted
+#   tr: A list of containing m data.tree structures created by tree.grow.bag
+tree.classify.bag <- function(data, tr) {
+  
+  # Create a matrix for the predictions of each tree
+  labels <- matrix(nrow=nrow(data), ncol=length(tr))
   predictions <- c()
-  for (i in 1:nrow(x)) {
-    labels <- c()
-    for (tree in tr) {
-      labels <- append(labels, tree.classify(x[i,], tree))
-    }
-    predictions[i] <- mode(labels)
+  # Classify the dataset for each tree in tr and put the predictions in the right column of the labels matrix
+  for (i in 1:length(tr)) {
+    labels[,i] <- tree.classify(data, tr[[i]])
+  }
+  # Calculate the final class label for each row based on what each tree predicted
+  for(i in 1:nrow(labels)) {
+    predictions[i] <- sum(labels[i,])>(0.5*length(labels[i,]))
   }
   return(predictions)
 }
 
+# Gives the precision, recall and accuracy for a two binary vectors
+#   y: the golden standard labels
+#   predictions: the predictions made by one of the tree.classify functions
 measures <- function(y, predictions) {
   TP <- 0
   FP <- 0
@@ -154,37 +235,50 @@ measures <- function(y, predictions) {
   precision <- TP/(TP+FP)
   recall <- TP/(TP+FN)
   accuracy <- (TP+TN)/length(predictions)
-  print(c(TP, FP, TN, FN))
-  return(c(precision, recall, accuracy))
+  return(list('precision'= precision, 'recall'= recall, 'accuracy'= accuracy))
 }
 
 
-# training data
-eclipse_2.0 <- read.csv2('C:/Users/Lisa/Desktop/UU/Data_Mining_2019/eclipse-metrics-packages-2.0.csv')
-data_eclipse_2.0 <- eclipse_2.0[,c(3, 5:44)]
-eclipse_2.0_labels <- as.numeric(eclipse_2.0[,4] > 0)
+# Load in training and test data
+train_data <- read.csv2("./eclipse-metrics-packages-2.0.csv")
+test_data <- read.csv2("./eclipse-metrics-packages-3.0.csv")
 
-# test data
-eclipse_3.0 <- read.csv2('C:/Users/Lisa/Desktop/UU/Data_Mining_2019/eclipse-metrics-packages-3.0.csv')
-data_eclipse_3.0 <- eclipse_3.0[,c(3, 5:44)]
-eclipse_3.0_labels <- as.numeric(eclipse_3.0[,4] > 0)
+# Create the class labels from the post data
+train_classes <- train_data[,4] > 0
+test_classes <- test_data[,4] > 0
 
-tree_1 <- tree.grow(data_eclipse_2.0, eclipse_2.0_labels, 15, 5, 41)
-predictions_1 <- tree.classify(data_eclipse_3.0, tree_1)
-measures_1 <- measures(eclipse_3.0_labels, predictions_1)
+# Take relevant columns from data
+train_data <- train_data[,c(3, 5:44)]
+test_data <- test_data[,c(3, 5:44)]
 
+# Convert the columns to numeric data to prevent errors
+for (col in 1:ncol(train_data)){
+  train_data[,col] <- as.numeric(as.character(train_data[,col]))
+  test_data[,col] <- as.numeric(as.character(test_data[,col]))
+}
 
-trees_1 <- tree.grow.bag(data_eclipse_2.0, eclipse_2.0_labels, 15, 5, 41, 100)
-predictions_2 <- tree.classify.bag(data_eclipse_3.0, trees_1)
-measures_2 <- measures(eclipse_3.0_labels, predictions_2)
+# Grow a single tree, since the dataset is global only row numbers ar given to tree.grow
+tree_1 <- tree.grow(c(1:nrow(train_data)), train_classes, 15, 5, 41)
+# Prints the tree in the correct way
+print(tree_1, 'splitValue', "splitAttribute")
+predictions_1 <- tree.classify(test_data, tree_1)
+measures_1 <- measures(test_classes, predictions_1)
+print(measures_1)
+# Prints the confusion matrix
+print(table(predictions_1, test_classes))
+
+# Grow trees using random forest and classify
+trees_1 <- tree.grow.bag(c(1:nrow(train_data)), train_classes, 15, 5, 41, 100)
+# print(trees_1[[1]], "splitValue", 'splitAttribute')
+predictions_2 <- tree.classify.bag(test_data, trees_1)
+measures_2 <- measures(test_classes, predictions_2)
 print(measures_2)
+print(table(predictions_2, test_classes))
 
-trees_2 <- tree.grow.bag(data_eclipse_2.0, eclipse_2.0_labels, 15, 5, 6, 100)
-predictions_3 <- tree.classify.bag(data_eclipse_3.0, trees_2)
-measures_3 <- measures(eclipse_3.0_labels, predictions_3)
-
-print(measures(eclipse_3.0_labels, predictions_1))
-head(data_eclipse_2.0)
-summary(as.numeric(as.character(data_eclipse_2.0[,ncol(data_eclipse_2.0)])))
-
-        
+# Grow trees using bagging and classify
+trees_2 <- tree.grow.bag(c(1:nrow(train_data)), train_classes, 15, 5, 6, 100)
+# print(trees_2[[1]], "splitValue", 'splitAttribute')
+predictions_3 <- tree.classify.bag(test_data, trees_2)
+measures_3 <- measures(test_classes, predictions_3)
+print(measures_3)
+print(table(predictions_3, test_classes))
