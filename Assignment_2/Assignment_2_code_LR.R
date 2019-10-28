@@ -6,7 +6,7 @@ library(caret)
 library(textmineR)
 library(RWeka)
 library(entropy)
-library(dplyr)
+library(glmnet)
 
 loadData <- function(location_t, location_d, from, to){
   data <- matrix(nrow = 1, ncol= 2)
@@ -46,6 +46,8 @@ test.data <-loadData('./op_spam_v1.4/negative_polarity/truthful_from_Web', './op
 
 #Turn data into a corpus
 train_corpus <- VCorpus(VectorSource(train.data[,1]))
+#Turn data into a corpus
+train_corpus <- VCorpus(VectorSource(train.data[,1]))
 train_corpus <- train_corpus %>% tm_map(content_transformer(tolower)) %>% tm_map(removeWords, stopwords("english")) %>%
   tm_map(lemmatize_words)%>%  tm_map(removePunctuation) %>%tm_map(removeNumbers) %>% 
   tm_map(stripWhitespace)%>% tm_map(removeWords, c(stopwords("en"), "th", "us", "also")) 
@@ -68,7 +70,6 @@ train_mi_bi <- apply(as.matrix(train_dtm_bi),2, function(x,y){mi.plugin(table(x,
 train_mi_bi_order <- order(train_mi_bi, decreasing = T)
 train_mi_bi[train_mi_bi_order[1:10]]
 
-
 # Create a test set for the unigram and bigram
 test_corpus <- VCorpus(VectorSource(test.data[,1]))
 test_corpus <- test_corpus %>% tm_map(content_transformer(tolower)) %>% tm_map(removeWords, stopwords("english")) %>%
@@ -77,22 +78,19 @@ test_corpus <- test_corpus %>% tm_map(content_transformer(tolower)) %>% tm_map(r
 
 test_dtm_uni <- DocumentTermMatrix(test_corpus, list(dictionary=dimnames(train_dtm_uni)[[2]]))
 test_dtm_bi <- DocumentTermMatrix(test_corpus,control = list(tokenize = BiGramTokenizer, dictionary=dimnames(train_dtm_bi)[[2]]))
-test_dtm_bi$dimnames$Terms
 
-# Naive Bayes classiffier unigram
-NV_classifier <- multinomial_naive_bayes(as.matrix(train_dtm_uni), as.factor(train.data[,2]))
-NV_pred <- predict(NV_classifier, as.matrix(test_dtm_uni))
+dim(train_dtm_uni)
+reviews.glmnet.uni <- cv.glmnet(as.matrix(train_dtm_uni), as.numeric(train.data[,2]), family = "binomial", type.measure = "class")
+plot(reviews.glmnet.uni)
+coef(reviews.glmnet.uni, s="lambda.1se")
+reviews.logreg.pred <- predict(reviews.glmnet.uni, newx = as.matrix(test_dtm_uni), s="lambda.1se", type="class")
+result_uni <- confusionMatrix(data = as.factor(reviews.logreg.pred), reference = as.factor(test.data[,2]))
+result_uni$byClass
 
-# Naive bayes classifier Bigram
-NV_classifier_bi <- multinomial_naive_bayes(as.matrix(train_dtm_bi), as.factor(train.data[,2]))
-NV_pred_bi <- predict(NV_classifier_bi, as.matrix(test_dtm_bi))
 
-NV_classifier_bi
-# ConfusionMatrices
-result_uni <- confusionMatrix(data = NV_pred, reference = as.factor(test.data[,2]), positive = "1",dnn = c("prediction", "actual"), mode = 'prec_recall')
-result_bi <- confusionMatrix(data = NV_pred_bi, reference = as.factor(test.data[,2]), positive = "1",dnn = c("prediction", "actual"))
-
-result_uni$overall["Accuracy"]
-result_uni$byClass[c("Precision", "Recall", "F1")]
-result_bi$overall["Accuracy"]
-result_bi$byClass[c("Precision", "Recall", "F1")]
+reviews.glmnet.bi <- cv.glmnet(as.matrix(train_dtm_bi), as.numeric(train.data[,2]), family = "binomial", type.measure = "class")
+plot(reviews.glmnet.bi)
+coef(reviews.glmnet.bi, s="lambda.1se")
+reviews.logreg.pred <- predict(reviews.glmnet.bi, newx = as.matrix(test_dtm_bi), s="lambda.1se", type="class")
+result_bi <- confusionMatrix(data = as.factor(reviews.logreg.pred), reference = as.factor(test.data[,2]))
+result_bi$byClass
